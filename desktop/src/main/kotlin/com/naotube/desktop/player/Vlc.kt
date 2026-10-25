@@ -14,7 +14,6 @@ import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.ImageInfo
-import org.jetbrains.skia.impl.BufferUtil
 import com.naotube.tv.core.NaoDownloader
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.log.LogLevel
@@ -97,37 +96,23 @@ object Vlc {
 }
 
 /**
- * Receives the decoded pictures from VLC and turns them into a Compose image. VLC writes into
- * the hidden buffer while the window draws the visible one; they are swapped on the UI thread.
+ * Receives the decoded pictures from VLC and turns them into a Compose image. VLC copies each
+ * picture into a Java array; the UI thread hands it to Skia. While the window has not shown a
+ * picture yet, newer ones are dropped instead of queuing up.
  */
 class VideoFrames : BufferFormatCallback, RenderCallback {
-    private class Buffer(val width: Int, val height: Int) {
-        val bitmap = Bitmap().apply {
-            allocPixels(ImageInfo(width, height, ColorType.BGRA_8888, ColorAlphaType.OPAQUE))
-        }
-        val pixels: ByteBuffer = BufferUtil.getByteBufferFromPointer(
-            bitmap.peekPixels()!!.addr,
-            width * height * 4,
-        )
-        val image: ImageBitmap = bitmap.asComposeImageBitmap()
-        @Volatile
-        var closed = false
-        fun close() {
-            closed = true
-            bitmap.close()
-        }
-    }
-
-    /** Guards the buffers: VLC's threads write pictures, the UI thread swaps and frees them. */
-    private val lock = Any()
-
-    // Read by the UI thread when drawing; replaced only on the UI thread.
-    @Volatile
-    private var front: Buffer? = null
-
-    // Written by VLC under [lock].
-    private var back: Buffer? = null
     private val pending = AtomicBoolean(false)
+
+    @Volatile
+    private var bytes: ByteArray? = null
+
+    @Volatile
+    private var info: ImageInfo? = null
+
+    // UI thread only
+    private var bitmap: Bitmap? = null
+    private var bitmapWidth = 0
+    private var bitmapHeight = 0
 
     /** Incremented on every new picture: reading it in a draw block redraws the video. */
     var frame by mutableLongStateOf(0L)
@@ -137,7 +122,9 @@ class VideoFrames : BufferFormatCallback, RenderCallback {
     var videoHeight by mutableIntStateOf(0)
         private set
 
-    val image: ImageBitmap? get() = front?.takeIf { !it.closed }?.image
+    /** The latest picture (UI thread). */
+    var image: ImageBitmap? = null
+        private set
 
     /** Pictures received from VLC (used by the self-test). */
     val displayed = AtomicLong()
@@ -155,23 +142,8 @@ class VideoFrames : BufferFormatCallback, RenderCallback {
         val h = sourceHeight.coerceAtLeast(2)
         lastWidth = w
         lastHeight = h
-        val newBack = Buffer(w, h)
-        val newFront = Buffer(w, h)
-        val oldBack = synchronized(lock) {
-            val previous = back
-            back = newBack
-            previous
-        }
-        EventQueue.invokeLater {
-            synchronized(lock) {
-                val oldFront = front
-                front = newFront
-                if (oldFront !== back) oldFront?.close()
-                if (oldBack !== back) oldBack?.close()
-            }
-            videoWidth = w
-            videoHeight = h
-        }
+        info = ImageInfo(w, h, ColorType.BGRA_8888, ColorAlphaType.OPAQUE)
+        bytes = ByteArray(w * h * 4)
         return RV32BufferFormat(w, h)
     }
 
@@ -191,52 +163,41 @@ class VideoFrames : BufferFormatCallback, RenderCallback {
         displayHeight: Int,
     ) {
         displayed.incrementAndGet()
-        // The window has not shown the previous picture yet: drop this one rather than queue up.
         if (!pending.compareAndSet(false, true)) return
-        val copied = synchronized(lock) {
-            val target = back
-            if (target == null || target.closed || target.width != bufferFormat.width || target.height != bufferFormat.height) {
-                null
-            } else {
-                val src = nativeBuffers[0].duplicate()
-                src.rewind()
-                val dst = target.pixels.duplicate()
-                dst.clear()
-                val count = minOf(src.remaining(), dst.remaining())
-                src.limit(src.position() + count)
-                dst.put(src)
-                target.bitmap.notifyPixelsChanged()
-                target
-            }
-        }
-        if (copied == null) {
+        val array = bytes
+        val imageInfo = info
+        if (array == null || imageInfo == null ||
+            imageInfo.width != bufferFormat.width || imageInfo.height != bufferFormat.height
+        ) {
             pending.set(false)
             return
         }
+        val src = nativeBuffers[0].duplicate()
+        src.rewind()
+        src.get(array, 0, minOf(array.size, src.remaining()))
         EventQueue.invokeLater {
-            synchronized(lock) {
-                val shown = front
-                // Swap only if nothing changed meanwhile (new video size, other picture).
-                if (shown != null && !shown.closed && back === copied &&
-                    shown.width == copied.width && shown.height == copied.height
-                ) {
-                    front = copied
-                    back = shown
+            try {
+                val bmp = bitmap ?: Bitmap().also { bitmap = it }
+                bmp.installPixels(imageInfo, array, imageInfo.width * 4)
+                if (image == null || bitmapWidth != imageInfo.width || bitmapHeight != imageInfo.height) {
+                    bitmapWidth = imageInfo.width
+                    bitmapHeight = imageInfo.height
+                    image = bmp.asComposeImageBitmap()
+                    videoWidth = imageInfo.width
+                    videoHeight = imageInfo.height
                 }
+                frame++
+            } finally {
+                pending.set(false)
             }
-            frame++
-            pending.set(false)
         }
     }
 
     fun release() {
         EventQueue.invokeLater {
-            synchronized(lock) {
-                front?.close()
-                back?.close()
-                front = null
-                back = null
-            }
+            image = null
+            bitmap?.close()
+            bitmap = null
         }
     }
 }

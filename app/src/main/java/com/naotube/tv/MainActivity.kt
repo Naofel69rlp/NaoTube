@@ -14,7 +14,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { NaoTubeRoot() }
+        setContent { NaoTubeRoot(onExit = { finish() }) }
     }
 
     override fun onStop() {

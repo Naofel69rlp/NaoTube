@@ -30,7 +30,7 @@ import kotlin.concurrent.thread
  */
 class StreamProxy(private val client: OkHttpClient) {
 
-    private class Upstream(val url: String, val mime: String, @Volatile var length: Long)
+    private class Upstream(val url: String, val mime: String, @Volatile var length: Long, val youtube: Boolean)
 
     private val streams = ConcurrentHashMap<String, Upstream>()
     private val requestCounter = AtomicLong(0)
@@ -51,9 +51,9 @@ class StreamProxy(private val client: OkHttpClient) {
     }
 
     /** @return the local address VLC should open for this YouTube stream. */
-    fun register(url: String, mime: String, length: Long): String {
+    fun register(url: String, mime: String, length: Long, youtube: Boolean = true): String {
         val id = UUID.randomUUID().toString().replace("-", "")
-        streams[id] = Upstream(url, mime, length)
+        streams[id] = Upstream(url, mime, length, youtube)
         return "http://127.0.0.1:$port/s/$id"
     }
 
@@ -161,8 +161,12 @@ class StreamProxy(private val client: OkHttpClient) {
 
     /** Opens one piece of the stream; the caller reads it fully. */
     private fun fetch(up: Upstream, from: Long, to: Long): InputStream {
-        val url = up.url + "&range=$from-$to&rn=${requestCounter.incrementAndGet()}"
-        val response = client.newCall(youtubeRequest(url)).execute()
+        val request = if (up.youtube) {
+            youtubeRequest(up.url + "&range=$from-$to&rn=${requestCounter.incrementAndGet()}")
+        } else {
+            plainRequest(up.url, from, to)
+        }
+        val response = client.newCall(request).execute()
         if (!response.isSuccessful) {
             response.close()
             throw IOException("YouTube a répondu ${response.code}")
@@ -179,12 +183,23 @@ class StreamProxy(private val client: OkHttpClient) {
     }
 
     private fun probeLength(up: Upstream): Long? = runCatching {
-        val url = up.url + "&range=0-0&rn=${requestCounter.incrementAndGet()}"
-        client.newCall(youtubeRequest(url)).execute().use { r ->
+        val request = if (up.youtube) {
+            youtubeRequest(up.url + "&range=0-0&rn=${requestCounter.incrementAndGet()}")
+        } else {
+            plainRequest(up.url, 0, 0)
+        }
+        client.newCall(request).execute().use { r ->
             r.header("Content-Range")?.substringAfter('/')?.toLongOrNull()
                 ?: r.header("X-Content-Length")?.toLongOrNull()
         }
     }.getOrNull()
+
+    private fun plainRequest(url: String, from: Long, to: Long): Request = Request.Builder()
+        .url(url)
+        .header("Range", "bytes=$from-$to")
+        .header("Accept-Encoding", "identity")
+        .header("User-Agent", NaoDownloader.USER_AGENT)
+        .build()
 
     private fun youtubeRequest(url: String): Request {
         val builder = Request.Builder()

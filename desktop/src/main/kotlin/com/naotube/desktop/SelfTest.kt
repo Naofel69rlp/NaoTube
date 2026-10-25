@@ -22,6 +22,7 @@ object SelfTest {
 
     fun run(): Int {
         var ok = true
+        Vlc.logLevel = uk.co.caprica.vlcj.log.LogLevel.WARNING
         println("[selftest] VLC folder: ${Vlc.bundledDir()?.absolutePath ?: "not found"}")
         val factory = Vlc.factory()
         if (factory == null) {
@@ -41,7 +42,12 @@ object SelfTest {
             }
         })
         player.audio().setMute(true)
-        player.media().play(SAMPLE, ":no-audio")
+        // Same path as a YouTube video: picture and sound as two streams through the local proxy.
+        val proxy = com.naotube.desktop.player.Proxy.instance
+        val videoUrl = proxy.register(SAMPLE, "video/mp4", -1, youtube = false)
+        val audioUrl = proxy.register(SAMPLE, "video/mp4", -1, youtube = false)
+        println("[selftest] playing $videoUrl + slave $audioUrl")
+        player.media().play(videoUrl, ":input-slave=$audioUrl")
         val started = playing.await(30, TimeUnit.SECONDS)
         Thread.sleep(6000)
         val pictures = frames.displayed.get()

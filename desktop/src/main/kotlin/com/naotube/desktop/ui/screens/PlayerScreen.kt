@@ -261,6 +261,7 @@ fun PlayerScreen(video: VideoItem, fromStart: Boolean, startMs: Long?) {
                     focusRequester = retry,
                 )
                 LaunchedEffect(error) { delay(80); runCatching { retry.requestFocus() } }
+                BackButton({ nav.back() }, Modifier.align(Alignment.TopStart).padding(start = 20.dp, top = 24.dp))
             }
         }
 

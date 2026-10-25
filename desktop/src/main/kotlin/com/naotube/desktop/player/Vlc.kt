@@ -15,7 +15,10 @@ import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.ImageInfo
 import org.jetbrains.skia.impl.BufferUtil
+import com.naotube.tv.core.NaoDownloader
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory
+import uk.co.caprica.vlcj.log.LogLevel
+import uk.co.caprica.vlcj.log.NativeLog
 import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormat
@@ -35,6 +38,10 @@ object Vlc {
         private set
 
     private var factoryInstance: MediaPlayerFactory? = null
+    private var nativeLog: NativeLog? = null
+
+    /** libVLC messages at this level and above go to naotube.log. */
+    var logLevel: LogLevel = LogLevel.ERROR
 
     /** Folder holding libvlc.dll, libvlccore.dll and plugins\. */
     fun bundledDir(): File? {
@@ -70,7 +77,18 @@ object Vlc {
                 "--no-sub-autodetect-file",
                 "--network-caching=1500",
                 "--http-reconnect",
-            ).also { factoryInstance = it }
+            ).also { factory ->
+                factoryInstance = factory
+                runCatching { factory.application().setUserAgent("NaoTube", NaoDownloader.USER_AGENT) }
+                runCatching {
+                    nativeLog = factory.application().newLog().apply {
+                        setLevel(logLevel)
+                        addLogListener { level, module, _, _, _, _, _, message ->
+                            println("[vlc ${level.name.lowercase()}] $module: $message")
+                        }
+                    }
+                }
+            }
         } catch (t: Throwable) {
             error = t.message ?: t.javaClass.simpleName
             null

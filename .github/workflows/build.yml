@@ -186,6 +186,7 @@ jobs:
         run: |
           mkdir -p shots
           cp build-windows.log shots/ 2>/dev/null || true
+          find . -maxdepth 6 -name "hs_err_pid*.log" -exec cp {} shots/ \; 2>/dev/null || true
           grep -n -E "^e: |error:|FAILURE|What went wrong|Could not|> " build-windows.log > shots/errors.txt 2>/dev/null || true
           git config user.name "naotube-ci"
           git config user.email "ci@users.noreply.github.com"

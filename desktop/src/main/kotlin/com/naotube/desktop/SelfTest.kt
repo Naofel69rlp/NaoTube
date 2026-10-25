@@ -53,14 +53,13 @@ object SelfTest {
             }
         })
         player.audio().setMute(true)
-        // Same path as a YouTube video: picture and sound as two streams through the local proxy.
+        // Same path as a YouTube video: through NaoTube's local proxy, drawn by NaoTube's renderer.
         val proxy = com.naotube.desktop.player.Proxy.instance
         val sample = pickSample()
         println("[selftest] sample: $sample")
         val videoUrl = proxy.register(sample, "video/mp4", -1, youtube = false)
-        val audioUrl = proxy.register(sample, "video/mp4", -1, youtube = false)
-        println("[selftest] playing $videoUrl + slave $audioUrl")
-        player.media().play(videoUrl, ":input-slave=$audioUrl")
+        println("[selftest] playing $videoUrl")
+        player.media().play(videoUrl, ":no-audio")
         val started = playing.await(30, TimeUnit.SECONDS)
         Thread.sleep(6000)
         val pictures = frames.displayed.get()

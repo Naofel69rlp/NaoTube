@@ -110,13 +110,22 @@ class VideoFrames : BufferFormatCallback, RenderCallback {
             width * height * 4,
         )
         val image: ImageBitmap = bitmap.asComposeImageBitmap()
-        fun close() = bitmap.close()
+        @Volatile
+        var closed = false
+        fun close() {
+            closed = true
+            bitmap.close()
+        }
     }
 
+    /** Guards the buffers: VLC's threads write pictures, the UI thread swaps and frees them. */
+    private val lock = Any()
+
+    // Read by the UI thread when drawing; replaced only on the UI thread.
     @Volatile
     private var front: Buffer? = null
 
-    @Volatile
+    // Written by VLC under [lock].
     private var back: Buffer? = null
     private val pending = AtomicBoolean(false)
 
@@ -128,7 +137,7 @@ class VideoFrames : BufferFormatCallback, RenderCallback {
     var videoHeight by mutableIntStateOf(0)
         private set
 
-    val image: ImageBitmap? get() = front?.image
+    val image: ImageBitmap? get() = front?.takeIf { !it.closed }?.image
 
     /** Pictures received from VLC (used by the self-test). */
     val displayed = AtomicLong()
@@ -146,16 +155,22 @@ class VideoFrames : BufferFormatCallback, RenderCallback {
         val h = sourceHeight.coerceAtLeast(2)
         lastWidth = w
         lastHeight = h
-        val oldFront = front
-        val oldBack = back
-        back = Buffer(w, h)
+        val newBack = Buffer(w, h)
         val newFront = Buffer(w, h)
+        val oldBack = synchronized(lock) {
+            val previous = back
+            back = newBack
+            previous
+        }
         EventQueue.invokeLater {
-            front = newFront
+            synchronized(lock) {
+                val oldFront = front
+                front = newFront
+                if (oldFront !== back) oldFront?.close()
+                if (oldBack !== back) oldBack?.close()
+            }
             videoWidth = w
             videoHeight = h
-            oldFront?.close()
-            oldBack?.close()
         }
         return RV32BufferFormat(w, h)
     }
@@ -178,25 +193,36 @@ class VideoFrames : BufferFormatCallback, RenderCallback {
         displayed.incrementAndGet()
         // The window has not shown the previous picture yet: drop this one rather than queue up.
         if (!pending.compareAndSet(false, true)) return
-        val target = back
-        if (target == null || target.width != bufferFormat.width || target.height != bufferFormat.height) {
+        val copied = synchronized(lock) {
+            val target = back
+            if (target == null || target.closed || target.width != bufferFormat.width || target.height != bufferFormat.height) {
+                null
+            } else {
+                val src = nativeBuffers[0].duplicate()
+                src.rewind()
+                val dst = target.pixels.duplicate()
+                dst.clear()
+                val count = minOf(src.remaining(), dst.remaining())
+                src.limit(src.position() + count)
+                dst.put(src)
+                target.bitmap.notifyPixelsChanged()
+                target
+            }
+        }
+        if (copied == null) {
             pending.set(false)
             return
         }
-        val src = nativeBuffers[0].duplicate()
-        src.rewind()
-        val dst = target.pixels.duplicate()
-        dst.clear()
-        val count = minOf(src.remaining(), dst.remaining())
-        src.limit(src.position() + count)
-        dst.put(src)
-        target.bitmap.notifyPixelsChanged()
         EventQueue.invokeLater {
-            val shown = front
-            // Skip pictures of a buffer replaced in the meantime (new video size).
-            if (shown != null && back === target && shown.width == target.width && shown.height == target.height) {
-                front = target
-                back = shown
+            synchronized(lock) {
+                val shown = front
+                // Swap only if nothing changed meanwhile (new video size, other picture).
+                if (shown != null && !shown.closed && back === copied &&
+                    shown.width == copied.width && shown.height == copied.height
+                ) {
+                    front = copied
+                    back = shown
+                }
             }
             frame++
             pending.set(false)
@@ -205,10 +231,12 @@ class VideoFrames : BufferFormatCallback, RenderCallback {
 
     fun release() {
         EventQueue.invokeLater {
-            front?.close()
-            back?.close()
-            front = null
-            back = null
+            synchronized(lock) {
+                front?.close()
+                back?.close()
+                front = null
+                back = null
+            }
         }
     }
 }

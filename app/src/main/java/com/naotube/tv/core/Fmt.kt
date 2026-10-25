@@ -134,7 +134,7 @@ object Fmt {
             is ContentNotAvailableException -> "Ce contenu n'est pas disponible."
             is ReCaptchaException -> "YouTube limite temporairement les requêtes. Réessaie dans un moment."
             is UnknownHostException, is ConnectException ->
-                "Pas de connexion Internet. Vérifie le réseau de ta TV."
+                "Pas de connexion Internet. Vérifie ton réseau."
             is SocketTimeoutException -> "La connexion est trop lente. Réessaie."
             is java.io.IOException -> cause.message ?: "Problème de connexion avec YouTube."
             else -> "Une erreur est survenue (${cause.javaClass.simpleName})."

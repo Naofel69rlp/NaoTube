@@ -9,3 +9,6 @@ captures/
 *~
 app/debug/
 app/release/
+
+# VLC is downloaded by the GitHub build
+desktop/resources/

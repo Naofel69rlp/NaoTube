@@ -417,7 +417,7 @@ class PlaybackSession(
         position = target
     }
 
-    fun setSpeed(value: Float) {
+    fun changeSpeed(value: Float) {
         speed = value
         player?.controls()?.setRate(value)
     }

@@ -586,7 +586,7 @@ private fun OptionsPanel(panel: Panel, session: PlaybackSession, onClose: () -> 
             }
         }
         Panel.Speed -> "Vitesse" to listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f).map { sp ->
-            Option(if (sp == 1f) "Normale" else speedLabel(sp), session.speed == sp) { session.setSpeed(sp) }
+            Option(if (sp == 1f) "Normale" else speedLabel(sp), session.speed == sp) { session.changeSpeed(sp) }
         }
     }
     val first = remember { FocusRequester() }

@@ -24,7 +24,7 @@ kotlin {
 // ------------------------------------------------------------------ shared code & assets
 // The YouTube engine, data models, SponsorBlock client and formatting helpers are the very same
 // files as in the Android TV app; fonts, logos and icons too.
-val syncSharedSources by tasks.registering(Sync::class) {
+val syncSharedSources = tasks.register<Sync>("syncSharedSources") {
     from("../app/src/main/java") {
         include(
             "com/naotube/tv/core/Fmt.kt",
@@ -37,7 +37,7 @@ val syncSharedSources by tasks.registering(Sync::class) {
     into(layout.buildDirectory.dir("shared/kotlin"))
 }
 
-val syncSharedResources by tasks.registering(Sync::class) {
+val syncSharedResources = tasks.register<Sync>("syncSharedResources") {
     from("../app/src/main/res/font") { into("fonts") }
     from("../app/src/main/res/drawable") {
         include("ic_*.xml")
@@ -47,7 +47,7 @@ val syncSharedResources by tasks.registering(Sync::class) {
     into(layout.buildDirectory.dir("shared/resources"))
 }
 
-val generateBuildInfo by tasks.registering {
+val generateBuildInfo = tasks.register("generateBuildInfo") {
     val out = layout.buildDirectory.dir("generated/buildinfo")
     val version = appVersion
     val repo = updateRepo

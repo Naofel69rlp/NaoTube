@@ -144,13 +144,20 @@ class Loader<T>(private val block: suspend () -> T) {
         if (!force && (state is Load.Ok || job?.isActive == true)) return
         state = Load.Loading
         job = appScope.launch {
-            state = try {
-                Load.Ok(block())
-            } catch (c: kotlinx.coroutines.CancellationException) {
-                throw c
-            } catch (t: Throwable) {
-                Load.Failed(t)
+            var result: Load<T> = Load.Loading
+            for (attempt in 0..2) {
+                result = try {
+                    Load.Ok(block())
+                } catch (c: kotlinx.coroutines.CancellationException) {
+                    throw c
+                } catch (t: Throwable) {
+                    Load.Failed(t)
+                }
+                if (result is Load.Ok) break
+                // The network or YouTube's first answer is often not ready right after start-up.
+                delay(1500L * (attempt + 1))
             }
+            state = result
         }
     }
 

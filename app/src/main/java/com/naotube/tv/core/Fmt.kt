@@ -136,6 +136,7 @@ object Fmt {
             is UnknownHostException, is ConnectException ->
                 "Pas de connexion Internet. Vérifie le réseau de ta TV."
             is SocketTimeoutException -> "La connexion est trop lente. Réessaie."
+            is java.io.IOException -> cause.message ?: "Problème de connexion avec YouTube."
             else -> "Une erreur est survenue (${cause.javaClass.simpleName})."
         }
     }

@@ -98,7 +98,7 @@ fun HomeScreen() {
                 out += Section("subs", "Nouveautés de tes abonnements", null, it)
             }
             kiosks.forEach { k -> k.await()?.takeIf { it.videos.isNotEmpty() }?.let { out += it } }
-            if (out.isEmpty()) error("Impossible de charger YouTube.")
+            if (out.isEmpty()) throw java.io.IOException("YouTube n'a renvoyé aucune vidéo.")
             out
         }
     }

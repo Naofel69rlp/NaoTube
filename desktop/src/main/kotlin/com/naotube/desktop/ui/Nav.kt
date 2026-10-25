@@ -44,6 +44,9 @@ val Screen.isTab: Boolean
 /** Remembers, per screen instance, loaded data and which element had the focus. */
 class ScreenMemory {
     var focusedKey: String? = null
+
+    /** Last focused element of the screen itself (not the navigation rail). */
+    var contentKey: String? = null
     val requesters = HashMap<String, FocusRequester>()
     val data = HashMap<String, Any?>()
 
@@ -54,6 +57,18 @@ class ScreenMemory {
     fun restoreFocus(): Boolean {
         val req = focusedKey?.let { requesters[it] } ?: return false
         return runCatching { req.requestFocus() }.getOrDefault(false)
+    }
+
+    /** From the navigation rail: goes back to the last focused element of the screen. */
+    fun restoreContentFocus(): Boolean {
+        val req = contentKey?.let { requesters[it] } ?: return false
+        return runCatching { req.requestFocus() }.getOrDefault(false)
+    }
+
+    /** Focuses the first element whose key is in [keys] that can take the focus. */
+    fun focusFirst(keys: List<String>): Boolean = keys.any { k ->
+        val req = requesters[k] ?: return@any false
+        runCatching { req.requestFocus() }.getOrDefault(false)
     }
 }
 
@@ -109,7 +124,12 @@ fun Modifier.remembered(key: String, requester: FocusRequester = remember { Focu
     }
     return this
         .focusRequester(requester)
-        .onFocusChanged { if (it.isFocused) memory.focusedKey = key }
+        .onFocusChanged {
+            if (it.isFocused) {
+                memory.focusedKey = key
+                if (!key.startsWith("rail")) memory.contentKey = key
+            }
+        }
 }
 
 /** On entering a screen: restore the previous focus, or focus [fallback]. */

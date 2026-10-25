@@ -38,6 +38,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,6 +80,9 @@ private class SearchState {
     var loading by mutableStateOf(false)
     var error by mutableStateOf<Throwable?>(null)
     var page: SearchPage? = null
+
+    /** Set by a new search: move the focus to the results once they arrive. */
+    var focusResults = false
     private var job: Job? = null
     private var moreJob: Job? = null
     private var suggestJob: Job? = null
@@ -98,6 +102,7 @@ private class SearchState {
         if (text.isEmpty()) return
         query = text
         submitted = text
+        focusResults = true
         job?.cancel()
         moreJob?.cancel()
         loading = true
@@ -142,6 +147,24 @@ fun SearchScreen() {
     val scope = com.naotube.desktop.ui.Loader.appScope
     val fieldFocus = remember { FocusRequester() }
     InitialFocus(fieldFocus)
+
+    val keyboard = LocalSoftwareKeyboardController.current
+    // After a search: close the keyboard and put the focus on the first result (channel or
+    // video), so the remote moves through the results right away.
+    LaunchedEffect(state.loading, state.submitted) {
+        if (state.loading || !state.focusResults) return@LaunchedEffect
+        state.focusResults = false
+        keyboard?.hide()
+        val keys = buildList {
+            state.channels.firstOrNull()?.let { add("sch/0/${it.url}") }
+            state.videos.firstOrNull()?.let { add("search:${state.submitted}/0/${it.url}") }
+        }
+        if (keys.isEmpty()) return@LaunchedEffect
+        repeat(12) {
+            delay(80)
+            if (memory.focusFirst(keys)) return@LaunchedEffect
+        }
+    }
 
     LaunchedEffect(state.query) {
         if (state.query != state.submitted) state.suggest(scope)

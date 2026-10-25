@@ -12,6 +12,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -206,6 +207,7 @@ private fun ScreenContent(screen: Screen) {
 @Composable
 private fun NavRail(current: Screen) {
     val nav = LocalNav.current
+    val memory = LocalMemory.current
     val accent = LocalAccent.current
     val update by Nao.updater.state.collectAsState()
     Column(
@@ -214,6 +216,10 @@ private fun NavRail(current: Screen) {
             .fillMaxHeight()
             .background(Brush.horizontalGradient(listOf(Color(0xF2060607), Color(0x99060607), Color.Transparent)))
             .padding(top = 20.dp, bottom = 24.dp)
+            // Right arrow: back to where the user was in the screen (results, rows…).
+            .onPreviewKeyEvent { e ->
+                e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight && memory.restoreContentFocus()
+            }
             .focusGroup(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(7.dp),

@@ -1,0 +1,26 @@
+---- NaoTube 1.0.10 2026-10-25 14:01:21
+[selftest] VLC folder: D:\a\NaoTube\NaoTube\desktop\build\compose\binaries\main\app\NaoTube\app\resources\vlc
+[selftest] OK vlc loaded: 3.0.24 Vetinari
+[vlc error] mmdevice: cannot get default device (error 0x80070490)
+[vlc error] mmdevice: cannot get device identifier (error 0x80070490)
+[vlc error] mmdevice: cannot get default device (error 0x80070490)
+[vlc error] mmdevice: cannot get device identifier (error 0x80070490)
+[selftest] sample: https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4
+[selftest] playing http://127.0.0.1:50148/s/8eb5c6601c0e45509439499fa481539b
+[vlc warning] mp4: elst box found
+[vlc warning] mp4: STTS table of 1 entries
+[vlc warning] mp4: CTTS table of 139 entries
+[vlc warning] mp4: elst box found
+[vlc warning] mp4: STTS table of 1 entries
+[vlc error] main: Failed to set on top
+[vlc error] main: Failed to set on top
+[vlc error] main: Failed to set on top
+[selftest] sample playing=true pictures=150 size=960x546
+[selftest] OK video decoding/rendering
+[selftest] OK youtube: 30 trending videos
+[selftest] PASSED
+---- NaoTube 1.0.10 2026-10-25 14:01:31
+[vlc error] mmdevice: cannot get default device (error 0x80070490)
+[vlc error] mmdevice: cannot get device identifier (error 0x80070490)
+[vlc error] mmdevice: cannot get default device (error 0x80070490)
+[vlc error] mmdevice: cannot get device identifier (error 0x80070490)

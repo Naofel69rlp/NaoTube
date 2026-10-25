@@ -1,0 +1,24 @@
+12:> Task :checkRuntime
+13:> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+14:> Task :convertXmlValueResourcesForMain NO-SOURCE
+15:> Task :copyNonXmlValueResourcesForMain NO-SOURCE
+16:> Task :prepareComposeResourcesTaskForMain NO-SOURCE
+17:> Task :generateResourceAccessorsForMain SKIPPED
+18:> Task :generateActualResourceCollectorsForMain SKIPPED
+19:> Task :generateBuildInfo
+20:> Task :generateComposeResClass SKIPPED
+21:> Task :syncSharedSources
+22:> Task :assembleMainResources
+23:> Task :syncSharedResources
+24:> Task :processResources
+25:> Task :createRuntimeImage
+26:> Task :compileKotlin
+27:> Task :prepareAppResources
+28:> Task :unpackDefaultComposeDesktopJvmApplicationResources
+30:> Task :downloadWix
+33:> Task :unzipWix
+35:> Task :compileKotlin
+39:> Task :compileJava NO-SOURCE
+40:> Task :classes
+41:> Task :jar
+43:> Task :createDistributable

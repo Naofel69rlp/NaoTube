@@ -169,6 +169,7 @@ class StreamProxy(private val client: OkHttpClient) {
         val response = client.newCall(request).execute()
         if (!response.isSuccessful) {
             response.close()
+            println("[proxy] upstream answered HTTP ${response.code}")
             throw IOException("YouTube a répondu ${response.code}")
         }
         val stream = response.body.byteStream()
@@ -189,10 +190,13 @@ class StreamProxy(private val client: OkHttpClient) {
             plainRequest(up.url, 0, 0)
         }
         client.newCall(request).execute().use { r ->
-            r.header("Content-Range")?.substringAfter('/')?.toLongOrNull()
+            val length = r.header("Content-Range")?.substringAfter('/')?.toLongOrNull()
                 ?: r.header("X-Content-Length")?.toLongOrNull()
+            if (length == null) println("[proxy] could not get the stream size (HTTP ${r.code})")
+            length
         }
-    }.getOrNull()
+    }.onFailure { println("[proxy] size request failed: ${it.javaClass.simpleName}: ${it.message}") }
+        .getOrNull()
 
     private fun plainRequest(url: String, from: Long, to: Long): Request = Request.Builder()
         .url(url)

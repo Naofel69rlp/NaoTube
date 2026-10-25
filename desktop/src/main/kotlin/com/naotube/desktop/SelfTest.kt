@@ -17,8 +17,19 @@ import java.util.concurrent.TimeUnit
  * pictures through NaoTube's renderer, and that YouTube answers. Used by the GitHub build.
  */
 object SelfTest {
-    private const val SAMPLE =
-        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+    private val SAMPLES = listOf(
+        "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+        "https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4",
+        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    )
+
+    /** First sample video that answers (the test must not depend on one website). */
+    private fun pickSample(): String = SAMPLES.firstOrNull { url ->
+        runCatching {
+            val request = okhttp3.Request.Builder().url(url).header("Range", "bytes=0-0").build()
+            Nao.httpClient.newCall(request).execute().use { it.code == 206 || it.code == 200 }
+        }.getOrDefault(false)
+    } ?: SAMPLES.first()
 
     fun run(): Int {
         var ok = true
@@ -44,8 +55,10 @@ object SelfTest {
         player.audio().setMute(true)
         // Same path as a YouTube video: picture and sound as two streams through the local proxy.
         val proxy = com.naotube.desktop.player.Proxy.instance
-        val videoUrl = proxy.register(SAMPLE, "video/mp4", -1, youtube = false)
-        val audioUrl = proxy.register(SAMPLE, "video/mp4", -1, youtube = false)
+        val sample = pickSample()
+        println("[selftest] sample: $sample")
+        val videoUrl = proxy.register(sample, "video/mp4", -1, youtube = false)
+        val audioUrl = proxy.register(sample, "video/mp4", -1, youtube = false)
         println("[selftest] playing $videoUrl + slave $audioUrl")
         player.media().play(videoUrl, ":input-slave=$audioUrl")
         val started = playing.await(30, TimeUnit.SECONDS)
